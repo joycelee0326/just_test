@@ -1,8 +1,10 @@
 # 瑣事助理行事曆訂閱
 
-`calendar.ics` 由 Claude 每 3 小時從「瑣事助理」同步一次。
+由 Claude 每 3 小時從「瑣事助理」同步一次。分組在 `build_ics.py` 最上面的 GROUPS 設定。
 
-訂閱網址：https://raw.githubusercontent.com/joycelee0326/just_test/main/calendar.ics
-
-- 手機（Android）：用 ICSx⁵ 訂閱上面的網址
-- iPhone：設定 → 行事曆 → 帳號 → 加入帳號 → 其他 → 加入訂閱的行事曆
+| 行事曆 | 網址 |
+|---|---|
+| 工作 | https://raw.githubusercontent.com/joycelee0326/just_test/main/work.ics |
+| 上課 | https://raw.githubusercontent.com/joycelee0326/just_test/main/school.ics |
+| 其他 | https://raw.githubusercontent.com/joycelee0326/just_test/main/other.ics |
+| 全部（一個顏色） | https://raw.githubusercontent.com/joycelee0326/just_test/main/calendar.ics |

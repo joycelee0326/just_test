@@ -9,7 +9,31 @@
   練琴、通勤這種自己規劃的時間不放
 """
 import json
+import os
 import sys
+
+# 分組：每組各輸出一個 .ics，在手機上分別訂閱、各自設顏色
+# 先看週時間表的類別（cat），沒有類別就看標題有沒有包含關鍵字
+GROUPS = [
+    ("work", "工作", {"c2"}, ["頭小", "頭份國中", "頭中", "三中", "圖書館"]),
+    ("school", "上課", {"c1"}, ["主修", "戲曲", "畢製", "數位音樂", "演出實務", "爵士", "Jazz", "jazz"]),
+]
+OTHER = ("other", "其他")
+# 標題有這些字就不算工作（例如「圖書館還書」是私事）
+NOT_WORK = ["還書", "借書"]
+
+
+def group_of(ev):
+    title = ev.get("title", "")
+    for key, _, cats, words in GROUPS:
+        if key == "work" and any(w in title for w in NOT_WORK):
+            continue
+        if any(w in title for w in words):
+            return key
+    for key, _, cats, words in GROUPS:
+        if ev.get("cat") in cats:
+            return key
+    return OTHER[0]
 from datetime import date, datetime, timedelta, timezone
 
 TZ = "Asia/Taipei"
@@ -131,25 +155,39 @@ def routine_event(r, stamp):
     return lines
 
 
+def header(name):
+    return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Joyce//瑣事助理//ZH-TW",
+            "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
+            f"X-WR-CALNAME:{name}", f"X-WR-TIMEZONE:{TZ}",
+            "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"] + VTIMEZONE
+
+
+def write(path, lines):
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write("\r\n".join(fold(l) for l in lines + ["END:VCALENDAR"]) + "\r\n")
+
+
 def main(items_path, routines_path, out_path):
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-    cal = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Joyce//瑣事助理//ZH-TW",
-           "CALSCALE:GREGORIAN", "METHOD:PUBLISH",
-           "X-WR-CALNAME:瑣事助理", f"X-WR-TIMEZONE:{TZ}",
-           "REFRESH-INTERVAL;VALUE=DURATION:PT1H", "X-PUBLISHED-TTL:PT1H"] + VTIMEZONE
-    n = 0
-    for it in load(items_path):
-        ev = item_event(it, stamp)
-        if ev:
-            cal += ev; n += 1
-    for r in load(routines_path):
-        ev = routine_event(r, stamp)
-        if ev:
-            cal += ev; n += 1
-    cal.append("END:VCALENDAR")
-    with open(out_path, "w", encoding="utf-8", newline="") as f:
-        f.write("\r\n".join(fold(l) for l in cal) + "\r\n")
-    print(f"寫入 {n} 個事件到 {out_path}")
+    names = {k: n for k, n, _, _ in GROUPS}
+    names[OTHER[0]] = OTHER[1]
+    allcal = header("瑣事助理")
+    parts = {k: header("瑣事助理・" + n) for k, n in names.items()}
+    count = {k: 0 for k in names}
+    evs = [(x, item_event(x, stamp)) for x in load(items_path)]
+    evs += [(x, routine_event(x, stamp)) for x in load(routines_path)]
+    for src, ev in evs:
+        if not ev:
+            continue
+        g = group_of(src)
+        allcal += ev
+        parts[g] += ev
+        count[g] += 1
+    write(out_path, allcal)
+    d = os.path.dirname(out_path) or "."
+    for k, lines in parts.items():
+        write(os.path.join(d, k + ".ics"), lines)
+    print("寫入", sum(count.values()), "個事件：", "、".join(f"{names[k]} {count[k]}" for k in names))
 
 
 if __name__ == "__main__":
